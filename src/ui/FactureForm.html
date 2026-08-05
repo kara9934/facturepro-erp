@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('src/ui/Styles'); ?>
+</head>
+<body>
+  <h2>Factures</h2>
+
+  <div class="barre">
+    <input id="recherche" placeholder="Rechercher (client, objet, n°, statut)…" style="flex:1;min-width:200px;">
+    <button class="btn btn-ghost" onclick="chargerFactures()">Rechercher</button>
+    <button class="btn btn-primary" onclick="afficherFormulaire()">➕ Nouvelle facture</button>
+  </div>
+
+  <!-- Formulaire -->
+  <div id="formulaire" style="display:none;border:1px solid var(--bordure);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--gris-clair);">
+    <input type="hidden" id="idFacture">
+    <div class="grille">
+      <div>
+        <label>Client *</label>
+        <select id="client"></select>
+      </div>
+      <div>
+        <label>Objet *</label>
+        <input id="objet" placeholder="Sujet global de la facture">
+      </div>
+      <div>
+        <label>Statut</label>
+        <select id="statut">
+          <option>En attente</option><option>Brouillon</option><option>Envoyée</option>
+          <option>Payée</option><option>En retard</option><option>Annulée</option>
+        </select>
+      </div>
+      <div>
+        <label>Date facture</label>
+        <input id="dateFacture" type="date">
+      </div>
+      <div>
+        <label>Date échéance</label>
+        <input id="dateEcheance" type="date">
+      </div>
+      <div>
+        <label>Mode de paiement</label>
+        <select id="modePaiement">
+          <option value="">—</option><option>Virement</option><option>Espèces</option>
+          <option>Chèque</option><option>Mobile Money</option><option>Carte bancaire</option>
+        </select>
+      </div>
+      <div>
+        <label>Référence</label>
+        <input id="reference">
+      </div>
+    </div>
+
+    <label style="margin-top:12px;display:block;">Lignes de la facture *</label>
+    <div style="overflow-x:auto;">
+      <table id="tableLignes" style="min-width:640px;">
+        <thead><tr>
+          <th style="min-width:150px;">Désignation</th>
+          <th>Qté</th><th>Unité</th><th>P.U. HT</th><th>Remise %</th><th>TVA %</th>
+          <th style="text-align:right;">Total HT</th><th></th>
+        </tr></thead>
+        <tbody id="lignesBody"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="ajouterLigne()" style="margin-top:8px;">➕ Ajouter une ligne</button>
+
+    <div style="margin-top:12px;text-align:right;line-height:1.8;">
+      <div>Total HT : <strong id="totalHT">—</strong></div>
+      <div id="ventilationTVA" class="muted"></div>
+      <div style="font-size:15px;color:#2563eb;font-weight:700;">Total TTC : <strong id="totalTTC">—</strong></div>
+    </div>
+
+    <label style="margin-top:12px;display:block;">Observations</label>
+    <textarea id="observations"></textarea>
+    <div class="barre" style="margin-top:12px;">
+      <button class="btn btn-primary" onclick="enregistrer()">💾 Enregistrer</button>
+      <button class="btn btn-ghost" onclick="masquerFormulaire()">Annuler</button>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>N°</th><th>Client</th><th>Objet</th><th>TTC</th><th>Statut</th><th>Échéance</th><th>Actions</th></tr></thead>
+    <tbody id="liste"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
+  </table>
+
+  <?!= include('src/ui/ClientJs'); ?>
+  <script>
+    var CLIENTS = [];
+    var TAUX_DEFAUT = 18;
+    var UNITES = ['unité','heure','jour','pièce','forfait','kg','mois'];
+
+    function num(el){ return Number(el && el.value) || 0; }
+    function val(id){ return document.getElementById(id).value; }
+
+    function init() {
+      appel('api_obtenirParametres', [], function (p) {
+        TAUX_DEFAUT = (p && p.tauxTVA != null) ? p.tauxTVA : 18;
+      });
+      appel('api_listerClients', [], function (clients) {
+        CLIENTS = clients;
+        var sel = document.getElementById('client');
+        sel.innerHTML = clients.map(function (c) {
+          return '<option value="' + esc(c.idClient) + '">' + esc(c.nom) + '</option>';
+        }).join('');
+      });
+      chargerFactures();
+    }
+
+    function chargerFactures() {
+      appel('api_rechercherFactures', [val('recherche')], render);
+    }
+
+    function render(factures) {
+      var tb = document.getElementById('liste');
+      if (!factures.length) { tb.innerHTML = '<tr><td colspan="7" class="muted">Aucune facture.</td></tr>'; return; }
+      tb.innerHTML = factures.map(function (f) {
+        return '<tr>' +
+          '<td>' + esc(f.idFacture) + '</td>' +
+          '<td>' + esc(f.client) + '</td>' +
+          '<td>' + esc(f.objet) + '</td>' +
+          '<td>' + money(f.montantTTC) + '</td>' +
+          '<td><span class="badge st-' + esc(f.statut) + '">' + esc(f.statut) + '</span></td>' +
+          '<td>' + esc(f.dateEcheance || '') + '</td>' +
+          '<td class="actions">' +
+            '<button class="btn btn-ghost btn-sm" title="Modifier" onclick="editer(\'' + f.idFacture + '\')">✏️</button>' +
+            '<button class="btn btn-ghost btn-sm" title="Générer le PDF" onclick="pdf(\'' + f.idFacture + '\')">📄</button>' +
+            '<button class="btn btn-ghost btn-sm" title="Envoyer par email" onclick="envoyer(\'' + f.idFacture + '\')">✉️</button>' +
+            '<button class="btn btn-ghost btn-sm" title="Marquer payée" onclick="encaisser(\'' + f.idFacture + '\')">💰</button>' +
+            '<button class="btn btn-danger btn-sm" title="Supprimer" onclick="supprimer(\'' + f.idFacture + '\')">🗑️</button>' +
+          '</td></tr>';
+      }).join('');
+    }
+
+    function uniteOptions(sel) {
+      return UNITES.map(function (u) {
+        return '<option' + (u === sel ? ' selected' : '') + '>' + u + '</option>';
+      }).join('');
+    }
+
+    function ligneRowHtml(l) {
+      l = l || {};
+      var q = (l.quantite != null && l.quantite !== '') ? l.quantite : 1;
+      var pu = (l.prixUnitaire != null) ? l.prixUnitaire : '';
+      var remise = (l.remise != null) ? l.remise : 0;
+      var taux = (l.tauxTva != null && l.tauxTva !== '') ? l.tauxTva : TAUX_DEFAUT;
+      return '<tr>' +
+        '<td><input class="l-designation" value="' + esc(l.designation || '') + '"></td>' +
+        '<td><input type="number" class="l-quantite" step="0.01" min="0" style="width:70px;" value="' + q + '" oninput="recalcul()"></td>' +
+        '<td><select class="l-unite">' + uniteOptions(l.unite) + '</select></td>' +
+        '<td><input type="number" class="l-prixUnitaire" step="0.01" min="0" style="width:100px;" value="' + pu + '" oninput="recalcul()"></td>' +
+        '<td><input type="number" class="l-remise" step="0.01" min="0" max="100" style="width:70px;" value="' + remise + '" oninput="recalcul()"></td>' +
+        '<td><input type="number" class="l-tauxTva" step="0.01" min="0" style="width:70px;" value="' + taux + '" oninput="recalcul()"></td>' +
+        '<td class="l-total" style="text-align:right;">—</td>' +
+        '<td><button class="btn btn-danger btn-sm" title="Retirer la ligne" onclick="retirerLigne(this)">🗑️</button></td>' +
+      '</tr>';
+    }
+
+    function ajouterLigne(l) {
+      document.getElementById('lignesBody').insertAdjacentHTML('beforeend', ligneRowHtml(l));
+      recalcul();
+    }
+    function retirerLigne(btn) {
+      var tr = btn.closest('tr'); tr.parentNode.removeChild(tr); recalcul();
+    }
+
+    function recalcul() {
+      var totalHT = 0, parTaux = {};
+      document.querySelectorAll('#lignesBody tr').forEach(function (tr) {
+        var q = num(tr.querySelector('.l-quantite'));
+        var pu = num(tr.querySelector('.l-prixUnitaire'));
+        var remise = num(tr.querySelector('.l-remise'));
+        var taux = num(tr.querySelector('.l-tauxTva'));
+        var base = q * pu;
+        var ht = base - base * remise / 100;
+        tr.querySelector('.l-total').textContent = money(ht);
+        totalHT += ht;
+        parTaux[taux] = (parTaux[taux] || 0) + ht;
+      });
+      var totalTVA = 0, vent = '';
+      Object.keys(parTaux).sort(function (a, b) { return b - a; }).forEach(function (t) {
+        var tva = parTaux[t] * Number(t) / 100;
+        totalTVA += tva;
+        vent += '<div>TVA ' + t + ' % : ' + money(tva) + '</div>';
+      });
+      document.getElementById('totalHT').textContent = money(totalHT);
+      document.getElementById('ventilationTVA').innerHTML = vent;
+      document.getElementById('totalTTC').textContent = money(totalHT + totalTVA);
+    }
+
+    function afficherFormulaire() {
+      document.getElementById('formulaire').style.display = 'block';
+      ['idFacture','objet','reference','observations','dateFacture','dateEcheance'].forEach(function(id){document.getElementById(id).value='';});
+      document.getElementById('statut').value = 'En attente';
+      document.getElementById('modePaiement').value = '';
+      document.getElementById('lignesBody').innerHTML = '';
+      ajouterLigne();
+    }
+    function masquerFormulaire() { document.getElementById('formulaire').style.display = 'none'; }
+
+    function collect() {
+      var sel = document.getElementById('client');
+      var opt = sel.options[sel.selectedIndex];
+      var lignes = [];
+      document.querySelectorAll('#lignesBody tr').forEach(function (tr) {
+        lignes.push({
+          designation: tr.querySelector('.l-designation').value,
+          quantite: num(tr.querySelector('.l-quantite')),
+          unite: tr.querySelector('.l-unite').value,
+          prixUnitaire: num(tr.querySelector('.l-prixUnitaire')),
+          remise: num(tr.querySelector('.l-remise')),
+          tauxTva: num(tr.querySelector('.l-tauxTva'))
+        });
+      });
+      return {
+        idClient: sel.value,
+        client: opt ? opt.textContent : '',
+        objet: val('objet'),
+        lignes: lignes,
+        statut: val('statut'),
+        dateFacture: val('dateFacture'),
+        dateEcheance: val('dateEcheance'),
+        modePaiement: val('modePaiement'),
+        reference: val('reference'),
+        observations: val('observations')
+      };
+    }
+
+    function enregistrer() {
+      var id = document.getElementById('idFacture').value;
+      var data = collect();
+      var fn = id ? 'api_modifierFacture' : 'api_creerFacture';
+      var args = id ? [id, data] : [data];
+      appel(fn, args, function () { toast('Facture enregistrée', true); masquerFormulaire(); chargerFactures(); });
+    }
+
+    function editer(id) {
+      appel('api_obtenirFacture', [id], function (f) {
+        afficherFormulaire();
+        document.getElementById('idFacture').value = f.idFacture;
+        var sel = document.getElementById('client');
+        sel.value = f.idClient || '';
+        if (sel.selectedIndex < 0) {
+          for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].textContent === f.client) { sel.selectedIndex = i; break; }
+          }
+        }
+        document.getElementById('objet').value = f.objet || '';
+        document.getElementById('statut').value = f.statut;
+        document.getElementById('dateFacture').value = f.dateFacture || '';
+        document.getElementById('dateEcheance').value = f.dateEcheance || '';
+        document.getElementById('modePaiement').value = f.modePaiement || '';
+        document.getElementById('reference').value = f.reference || '';
+        document.getElementById('observations').value = f.observations || '';
+        var body = document.getElementById('lignesBody');
+        body.innerHTML = '';
+        if (f.lignes && f.lignes.length) {
+          f.lignes.forEach(function (l) { ajouterLigne(l); });
+        } else {
+          ajouterLigne({ designation: f.objet, quantite: 1, prixUnitaire: f.montantHT, remise: 0, tauxTva: TAUX_DEFAUT });
+        }
+        recalcul();
+      });
+    }
+
+    function supprimer(id) {
+      if (!confirm('Supprimer la facture ' + id + ' ?')) return;
+      appel('api_supprimerFacture', [id], function () { toast('Supprimée', true); chargerFactures(); });
+    }
+    function encaisser(id) {
+      appel('api_encaisserFacture', [id, {}], function () { toast('Facture encaissée', true); chargerFactures(); });
+    }
+    function pdf(id) {
+      toast('Génération du PDF…', true);
+      appel('api_genererPdf', [id], function (r) { window.open(r.url, '_blank'); });
+    }
+    function envoyer(id) {
+      if (!confirm('Envoyer la facture ' + id + ' par email au client ?')) return;
+      toast('Envoi en cours…', true);
+      appel('api_envoyerFactureEmail', [id, {}], function (r) { toast('Envoyée à ' + r.destinataire, true); chargerFactures(); });
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

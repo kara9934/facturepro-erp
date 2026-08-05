@@ -1,0 +1,14 @@
+# Clasp / secrets
+.clasp.json
+.clasprc.json
+*.local
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Node (si tooling ajouté plus tard)
+node_modules/

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('src/ui/Styles'); ?>
+</head>
+<body>
+  <h2>Clients</h2>
+  <div class="barre">
+    <input id="recherche" placeholder="Rechercher un client…" style="flex:1;min-width:200px;">
+    <button class="btn btn-ghost" onclick="charger()">Rechercher</button>
+    <button class="btn btn-primary" onclick="afficherFormulaire()">➕ Nouveau client</button>
+  </div>
+
+  <div id="formulaire" style="display:none;border:1px solid var(--bordure);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--gris-clair);">
+    <input type="hidden" id="idClient">
+    <div class="grille">
+      <div><label>Nom *</label><input id="nom"></div>
+      <div><label>Contact</label><input id="contact"></div>
+      <div><label>N° Contribuable (NCC)</label><input id="numeroContribuable"></div>
+      <div><label>Téléphone</label><input id="telephone"></div>
+      <div><label>Email</label><input id="email" type="email"></div>
+      <div><label>Ville</label><input id="ville"></div>
+      <div><label>Pays</label><input id="pays"></div>
+      <div><label>Statut</label><select id="statut"><option>Actif</option><option>Inactif</option></select></div>
+    </div>
+    <label>Adresse</label><textarea id="adresse"></textarea>
+    <div class="barre" style="margin-top:12px;">
+      <button class="btn btn-primary" onclick="enregistrer()">💾 Enregistrer</button>
+      <button class="btn btn-ghost" onclick="masquer()">Annuler</button>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>ID</th><th>Nom</th><th>Contact</th><th>Téléphone</th><th>Email</th><th>Ville</th><th>Statut</th><th>Actions</th></tr></thead>
+    <tbody id="liste"><tr><td colspan="8" class="muted">Chargement…</td></tr></tbody>
+  </table>
+
+  <?!= include('src/ui/ClientJs'); ?>
+  <script>
+    function charger() { appel('api_rechercherClients', [document.getElementById('recherche').value], render); }
+    function render(clients) {
+      var tb = document.getElementById('liste');
+      if (!clients.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">Aucun client.</td></tr>'; return; }
+      tb.innerHTML = clients.map(function (c) {
+        return '<tr><td>' + esc(c.idClient) + '</td><td>' + esc(c.nom) + '</td><td>' + esc(c.contact) +
+          '</td><td>' + esc(c.telephone) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.ville) +
+          '</td><td><span class="badge ' + (c.statut === 'Actif' ? 'st-Payée' : 'st-Brouillon') + '">' + esc(c.statut) + '</span></td>' +
+          '<td class="actions"><button class="btn btn-ghost btn-sm" onclick="editer(\'' + c.idClient + '\')">✏️</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="supprimer(\'' + c.idClient + '\')">🗑️</button></td></tr>';
+      }).join('');
+    }
+    function afficherFormulaire() {
+      document.getElementById('formulaire').style.display = 'block';
+      ['idClient','nom','contact','numeroContribuable','telephone','email','ville','pays','adresse'].forEach(function(id){document.getElementById(id).value='';});
+      document.getElementById('statut').value = 'Actif';
+    }
+    function masquer() { document.getElementById('formulaire').style.display = 'none'; }
+    function collect() {
+      return { nom:val('nom'), contact:val('contact'), numeroContribuable:val('numeroContribuable'),
+        telephone:val('telephone'), email:val('email'),
+        ville:val('ville'), pays:val('pays'), statut:val('statut'), adresse:val('adresse') };
+    }
+    function val(id){return document.getElementById(id).value;}
+    function enregistrer() {
+      var id = document.getElementById('idClient').value;
+      var fn = id ? 'api_modifierClient' : 'api_creerClient';
+      var args = id ? [id, collect()] : [collect()];
+      appel(fn, args, function () { toast('Client enregistré', true); masquer(); charger(); });
+    }
+    function editer(id) {
+      appel('api_obtenirClient', [id], function (c) {
+        afficherFormulaire();
+        document.getElementById('idClient').value = c.idClient;
+        ['nom','contact','numeroContribuable','telephone','email','ville','pays','adresse'].forEach(function(k){document.getElementById(k).value=c[k]||'';});
+        document.getElementById('statut').value = c.statut;
+      });
+    }
+    function supprimer(id) {
+      if (!confirm('Supprimer ce client ?')) return;
+      appel('api_supprimerClient', [id], function () { toast('Supprimé', true); charger(); });
+    }
+    window.onload = charger;
+  </script>
+</body>
+</html>

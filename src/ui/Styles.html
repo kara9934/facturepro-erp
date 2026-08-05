@@ -1,0 +1,35 @@
+<style>
+  :root{
+    --bleu:#2563eb; --bleu-fonce:#1d4ed8; --gris:#6b7280; --gris-clair:#f9fafb;
+    --bordure:#e5e7eb; --vert:#16a34a; --rouge:#dc2626; --orange:#d97706;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:'Segoe UI',Roboto,Arial,sans-serif;color:#1f2933;margin:0;padding:16px;background:#fff;font-size:13px;}
+  h2{margin:0 0 12px;color:var(--bleu);font-size:18px;}
+  .barre{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  input,select,textarea{width:100%;padding:8px;border:1px solid var(--bordure);border-radius:6px;font-size:13px;font-family:inherit;}
+  textarea{resize:vertical;min-height:52px;}
+  label{display:block;font-weight:600;margin:8px 0 4px;color:#374151;font-size:12px;}
+  .grille{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;}
+  .btn{padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;}
+  .btn-primary{background:var(--bleu);color:#fff;}
+  .btn-primary:hover{background:var(--bleu-fonce);}
+  .btn-ghost{background:var(--gris-clair);color:#374151;border:1px solid var(--bordure);}
+  .btn-danger{background:#fee2e2;color:var(--rouge);}
+  .btn-sm{padding:4px 8px;font-size:11px;}
+  table{width:100%;border-collapse:collapse;margin-top:8px;}
+  th{background:var(--gris-clair);text-align:left;padding:6px;font-size:11px;color:var(--gris);border-bottom:2px solid var(--bordure);}
+  td{padding:6px;border-bottom:1px solid var(--bordure);font-size:12px;}
+  tr:hover td{background:#f8fafc;}
+  .badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;}
+  .st-Payée{background:#dcfce7;color:var(--vert);}
+  .st-En\ retard{background:#fee2e2;color:var(--rouge);}
+  .st-En\ attente{background:#fef3c7;color:var(--orange);}
+  .st-Brouillon,.st-Envoyée,.st-Annulée{background:#e5e7eb;color:var(--gris);}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:8px;color:#fff;font-weight:600;opacity:0;transition:.3s;z-index:99;}
+  .toast.show{opacity:1;}
+  .toast.ok{background:var(--vert);} .toast.err{background:var(--rouge);}
+  .muted{color:var(--gris);font-size:11px;}
+  .actions{display:flex;gap:4px;}
+  .spinner{display:none;} .spinner.show{display:inline;}
+</style>

@@ -1,0 +1,31 @@
+<script>
+  /**
+   * Helpers client partagés : appel serveur avec gestion du Result, toasts.
+   * Toutes les fonctions serveur renvoient { success, data, error }.
+   */
+  function appel(fonction, args, onOk) {
+    return new Promise(function (resolve, reject) {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res && res.success) { if (onOk) onOk(res.data); resolve(res.data); }
+          else { toast((res && res.error && res.error.message) || 'Erreur', false); reject(res && res.error); }
+        })
+        .withFailureHandler(function (err) { toast(err.message || 'Erreur serveur', false); reject(err); })
+      [fonction].apply(null, args || []);
+    });
+  }
+
+  function toast(msg, ok) {
+    var t = document.getElementById('toast');
+    if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.className = 'toast show ' + (ok === false ? 'err' : 'ok');
+    setTimeout(function () { t.className = 'toast'; }, 3000);
+  }
+
+  function money(n) {
+    n = Number(n) || 0;
+    return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+  function esc(s){var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+</script>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('src/ui/Styles'); ?>
+</head>
+<body>
+  <h2>Paramètres de l'entreprise</h2>
+  <div class="grille">
+    <div><label>Nom de l'entreprise *</label><input id="nomEntreprise"></div>
+    <div><label>Numéro contribuable</label><input id="numeroContribuable"></div>
+    <div><label>Téléphone</label><input id="telephone"></div>
+    <div><label>Email</label><input id="email" type="email"></div>
+    <div><label>Site web</label><input id="siteWeb"></div>
+    <div><label>Devise</label><input id="devise"></div>
+    <div><label>Taux TVA (%)</label><input id="tauxTVA" type="number" step="0.01" min="0"></div>
+    <div><label>Délai de paiement (jours)</label><input id="delaiPaiement" type="number" min="0"></div>
+  </div>
+  <label>Adresse</label><textarea id="adresse"></textarea>
+  <div class="barre" style="margin-top:12px;">
+    <button class="btn btn-primary" onclick="enregistrer()">💾 Enregistrer</button>
+  </div>
+
+  <?!= include('src/ui/ClientJs'); ?>
+  <script>
+    var CHAMPS = ['nomEntreprise','numeroContribuable','telephone','email','siteWeb','devise','tauxTVA','delaiPaiement','adresse'];
+    function charger() {
+      appel('api_obtenirParametres', [], function (p) {
+        CHAMPS.forEach(function (c) { document.getElementById(c).value = p[c] == null ? '' : p[c]; });
+      });
+    }
+    function enregistrer() {
+      var data = {};
+      CHAMPS.forEach(function (c) { data[c] = document.getElementById(c).value; });
+      appel('api_enregistrerParametres', [data], function () { toast('Paramètres enregistrés', true); });
+    }
+    window.onload = charger;
+  </script>
+</body>
+</html>
