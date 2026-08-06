@@ -25,6 +25,11 @@ class Facture {
     this.modePaiement = data.modePaiement || '';
     this.reference = data.reference || '';
     this.observations = data.observations || '';
+    // Certification FNE (DGI). Renseignés après appel à FneService.certifier().
+    this.numeroFiscal = data.numeroFiscal || '';
+    this.fneToken = data.fneToken || '';
+    this.fneInvoiceId = data.fneInvoiceId || '';
+    this.fneStatut = data.fneStatut || FNE_STATUT.NON_CERTIFIEE;
   }
 
   /**
@@ -123,6 +128,10 @@ class Facture {
       modePaiement: row['Mode_Paiement'],
       reference: row['Référence'],
       observations: row['Observations'],
+      numeroFiscal: row['Numero_Fiscal'],
+      fneToken: row['FNE_Token'],
+      fneInvoiceId: row['FNE_Invoice_Id'],
+      fneStatut: row['FNE_Statut'],
     });
   }
 
@@ -144,6 +153,10 @@ class Facture {
       'Mode_Paiement': this.modePaiement,
       'Référence': this.reference,
       'Observations': this.observations,
+      'Numero_Fiscal': this.numeroFiscal,
+      'FNE_Token': this.fneToken,
+      'FNE_Invoice_Id': this.fneInvoiceId,
+      'FNE_Statut': this.fneStatut,
     };
   }
 
@@ -166,6 +179,10 @@ class Facture {
       modePaiement: this.modePaiement,
       reference: this.reference,
       observations: this.observations,
+      numeroFiscal: this.numeroFiscal,
+      fneToken: this.fneToken,
+      fneInvoiceId: this.fneInvoiceId,
+      fneStatut: this.fneStatut,
     };
   }
 }

@@ -81,8 +81,8 @@
   </div>
 
   <table>
-    <thead><tr><th>N°</th><th>Client</th><th>Objet</th><th>TTC</th><th>Statut</th><th>Échéance</th><th>Actions</th></tr></thead>
-    <tbody id="liste"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
+    <thead><tr><th>N°</th><th>Client</th><th>Objet</th><th>TTC</th><th>Statut</th><th>Échéance</th><th>FNE</th><th>Actions</th></tr></thead>
+    <tbody id="liste"><tr><td colspan="8" class="muted">Chargement…</td></tr></tbody>
   </table>
 
   <?!= include('src/ui/ClientJs'); ?>
@@ -114,8 +114,16 @@
 
     function render(factures) {
       var tb = document.getElementById('liste');
-      if (!factures.length) { tb.innerHTML = '<tr><td colspan="7" class="muted">Aucune facture.</td></tr>'; return; }
+      if (!factures.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">Aucune facture.</td></tr>'; return; }
       tb.innerHTML = factures.map(function (f) {
+        var certifiee = (f.fneStatut === 'Certifiée' && f.numeroFiscal);
+        var fneCell = certifiee
+          ? '<span class="badge st-Payée" title="Certifiée — le numéro fiscal figure sur le PDF">' + esc(f.numeroFiscal) + '</span>'
+          : (f.fneStatut === 'Erreur'
+              ? '<span class="badge" style="background:#fee2e2;color:#dc2626;" title="Échec de certification">Erreur</span>'
+              : '<span class="muted">Non certifiée</span>');
+        var certBtn = certifiee ? ''
+          : '<button class="btn btn-ghost btn-sm" title="Certifier FNE" onclick="certifierFne(\'' + f.idFacture + '\')">🧾</button>';
         return '<tr>' +
           '<td>' + esc(f.idFacture) + '</td>' +
           '<td>' + esc(f.client) + '</td>' +
@@ -123,7 +131,9 @@
           '<td>' + money(f.montantTTC) + '</td>' +
           '<td><span class="badge st-' + esc(f.statut) + '">' + esc(f.statut) + '</span></td>' +
           '<td>' + esc(f.dateEcheance || '') + '</td>' +
+          '<td>' + fneCell + '</td>' +
           '<td class="actions">' +
+            certBtn +
             '<button class="btn btn-ghost btn-sm" title="Modifier" onclick="editer(\'' + f.idFacture + '\')">✏️</button>' +
             '<button class="btn btn-ghost btn-sm" title="Générer le PDF" onclick="pdf(\'' + f.idFacture + '\')">📄</button>' +
             '<button class="btn btn-ghost btn-sm" title="Envoyer par email" onclick="envoyer(\'' + f.idFacture + '\')">✉️</button>' +
@@ -279,6 +289,15 @@
       if (!confirm('Envoyer la facture ' + id + ' par email au client ?')) return;
       toast('Envoi en cours…', true);
       appel('api_envoyerFactureEmail', [id, {}], function (r) { toast('Envoyée à ' + r.destinataire, true); chargerFactures(); });
+    }
+    function certifierFne(id) {
+      if (!confirm('Certifier la facture ' + id + ' auprès de la FNE ?\n\nMode simulation si aucune URL DGI n\'est configurée (facture NON opposable).')) return;
+      toast('Certification FNE…', true);
+      appel('api_certifierFacture', [id], function (r) {
+        var suffixe = (r.mode === 'simulation') ? ' (SIMULATION — non opposable)' : '';
+        toast('Certifiée : ' + r.reference + suffixe, true);
+        chargerFactures();
+      });
     }
 
     window.onload = init;

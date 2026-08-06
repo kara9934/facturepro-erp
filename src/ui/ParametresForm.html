@@ -17,13 +17,28 @@
     <div><label>Délai de paiement (jours)</label><input id="delaiPaiement" type="number" min="0"></div>
   </div>
   <label>Adresse</label><textarea id="adresse"></textarea>
+
+  <h2 style="margin-top:20px;font-size:15px;">Facturation Normalisée Électronique (FNE)</h2>
+  <p class="muted" style="margin:0 0 8px;line-height:1.5;">
+    Laissez « URL de l'API FNE » <strong>vide</strong> pour le mode simulation
+    (démonstration technique — les factures ne sont pas certifiées par la DGI ni
+    légalement opposables). Renseignez l'URL et la clé fournies par la DGI pour
+    passer en mode réel, sans rien changer d'autre.
+  </p>
+  <div class="grille">
+    <div><label>URL de l'API FNE</label><input id="fneUrl" placeholder="vide = simulation"></div>
+    <div><label>Clé API (Bearer)</label><input id="fneCleApi" placeholder="fournie par la DGI"></div>
+    <div><label>Point de vente</label><input id="fnePointVente" placeholder="ex : Siège"></div>
+    <div><label>Établissement</label><input id="fneEtablissement" placeholder="ex : Abidjan"></div>
+  </div>
+
   <div class="barre" style="margin-top:12px;">
     <button class="btn btn-primary" onclick="enregistrer()">💾 Enregistrer</button>
   </div>
 
   <?!= include('src/ui/ClientJs'); ?>
   <script>
-    var CHAMPS = ['nomEntreprise','numeroContribuable','telephone','email','siteWeb','devise','tauxTVA','delaiPaiement','adresse'];
+    var CHAMPS = ['nomEntreprise','numeroContribuable','telephone','email','siteWeb','devise','tauxTVA','delaiPaiement','adresse','fneUrl','fneCleApi','fnePointVente','fneEtablissement'];
     function charger() {
       appel('api_obtenirParametres', [], function (p) {
         CHAMPS.forEach(function (c) { document.getElementById(c).value = p[c] == null ? '' : p[c]; });

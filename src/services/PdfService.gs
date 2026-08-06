@@ -45,6 +45,45 @@ class PdfService {
   }
 
   /**
+   * Construit le bandeau de certification FNE (pied de facture, pleine largeur).
+   * N'apparaît que si la facture est certifiée. En mode simulation, un marquage
+   * explicite « NON OPPOSABLE » et un visuel neutre (jamais l'emblème officiel
+   * de la DGI) signalent que le document n'a pas de valeur légale.
+   * @param {Facture} facture
+   * @param {Parametres} params
+   * @returns {string} HTML du bandeau (vide si non certifiée)
+   * @private
+   */
+  _bandeauFne(facture, params) {
+    if (facture.fneStatut !== FNE_STATUT.CERTIFIEE || !facture.numeroFiscal) return '';
+
+    const token = String(facture.fneToken || '');
+    // Le token porte la trace du mode : une URL de simulation => non opposable.
+    const simulation = token
+      ? token.indexOf('simulation.fne.local') !== -1
+      : !String(params.fneUrl || '').trim();
+
+    const qr = token ? QrCode.htmlTable(token, { module: 3, marge: 2 }) : '';
+    const classeSim = simulation ? ' sim' : '';
+    const banniere = simulation
+      ? '<div class="fne-sim">SIMULATION FNE — DOCUMENT NON OPPOSABLE</div>'
+      : '';
+
+    return '<div class="fne-band' + classeSim + '">'
+      + banniere
+      + '<table class="fne-inner"><tr>'
+      + '<td class="fne-badge-cell"><div class="fne-badge">FNE</div></td>'
+      + '<td class="fne-info">'
+      + '<div class="fne-title">Facture Normalis\u00e9e \u00c9lectronique</div>'
+      + '<div class="fne-num">N\u00b0 <strong>' + escapeHtml(facture.numeroFiscal) + '</strong></div>'
+      + (token ? '<div class="fne-verif">V\u00e9rification : ' + escapeHtml(token) + '</div>' : '')
+      + (simulation ? '<div class="fne-note">Certification simul\u00e9e \u2014 sans valeur l\u00e9gale (d\u00e9monstration).</div>' : '')
+      + '</td>'
+      + (qr ? '<td class="fne-qr">' + qr + '</td>' : '')
+      + '</tr></table></div>';
+  }
+
+  /**
    * Template HTML de la facture.
    * @private
    */
@@ -116,7 +155,22 @@ class PdfService {
       '.totaux{margin-top:16px;width:40%;float:right;}',
       '.totaux td{border:none;padding:4px 8px;}',
       '.ttc{font-size:15px;font-weight:bold;color:#2563eb;border-top:2px solid #2563eb;}',
-      '.pied{margin-top:80px;text-align:center;color:#9ca3af;font-size:10px;clear:both;}',
+      '.pied{margin-top:40px;text-align:center;color:#9ca3af;font-size:10px;clear:both;}',
+      '.fne-band{clear:both;margin-top:32px;border:2px solid #16a34a;border-radius:6px;padding:10px 14px;background:#f0fdf4;}',
+      '.fne-band.sim{border-color:#b91c1c;background:#fef2f2;}',
+      '.fne-sim{background:#b91c1c;color:#fff;font-weight:bold;text-align:center;padding:5px;border-radius:4px;margin-bottom:8px;font-size:11px;letter-spacing:1px;}',
+      '.fne-inner{width:100%;border-collapse:collapse;}',
+      '.fne-inner td{border:none;padding:0;vertical-align:middle;}',
+      '.fne-badge-cell{width:64px;}',
+      '.fne-badge{border:2px solid #16a34a;color:#16a34a;font-weight:bold;font-size:16px;padding:8px 10px;border-radius:6px;text-align:center;letter-spacing:1px;}',
+      '.fne-band.sim .fne-badge{border-color:#b91c1c;color:#b91c1c;}',
+      '.fne-info{padding-left:14px !important;}',
+      '.fne-title{font-weight:bold;color:#166534;font-size:13px;}',
+      '.fne-band.sim .fne-title{color:#991b1b;}',
+      '.fne-num{font-size:15px;margin-top:3px;}',
+      '.fne-verif{color:#6b7280;font-size:9px;margin-top:5px;word-break:break-all;}',
+      '.fne-note{color:#b91c1c;font-size:9px;margin-top:3px;font-style:italic;}',
+      '.fne-qr{width:130px;text-align:right;}',
       '</style></head><body>',
 
       '<div class="entete"><div>',
@@ -134,6 +188,8 @@ class PdfService {
       objetHtml,
       lignesHtml,
       totauxHtml,
+
+      this._bandeauFne(facture, params),
 
       '<div class="pied">Statut : ', escapeHtml(facture.statut),
       facture.observations ? ' &middot; ' + escapeHtml(facture.observations) : '',

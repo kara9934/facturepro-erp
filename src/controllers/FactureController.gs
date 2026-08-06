@@ -71,6 +71,16 @@ function api_genererPdf(id) {
   });
 }
 
+/**
+ * Certifie une facture auprès de la FNE (simulation ou réel selon l'URL des
+ * Paramètres). Renvoie le numéro fiscal, le token de vérification et le mode.
+ * @param {string} id
+ * @returns {Object} Result<FNE>
+ */
+function api_certifierFacture(id) {
+  return guard('certifierFacture', () => new FneService().certifier(id));
+}
+
 /** @param {string} id @param {Object} options @returns {Object} Result */
 function api_envoyerFactureEmail(id, options) {
   return guard('envoyerFactureEmail', () =>

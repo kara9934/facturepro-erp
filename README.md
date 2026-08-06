@@ -32,6 +32,7 @@ Un classeur de démonstration rempli de données réalistes (clients, factures a
 | **Clients** | CRUD complet, recherche plein texte, **N° Contribuable (NCC)** |
 | **Liaison** | Clé `ID_Client` reliant chaque facture à son client (référence stable) |
 | **PDF** | Génération d'un PDF détaillé (tableau des lignes + TVA ventilée) + archivage Google Drive |
+| **FNE / DGI** | Certification via l'API FNE (mode simulation ou réel selon config) : numéro fiscal officiel, sticker de certification, **QR code de vérification** (générateur maison, sans dépendance), pré-validation en français des exigences DGI — *voir le statut de conformité ci-dessous* |
 | **Email** | Envoi de la facture (PDF joint) au client |
 | **Tableau de bord** | 8 KPI recalculés automatiquement |
 | **Automatisation** | Trigger quotidien : détection des retards + rafraîchissement des KPI |
@@ -51,7 +52,19 @@ Un classeur de démonstration rempli de données réalistes (clients, factures a
 
 ## 🇨🇮 Contexte réglementaire (Côte d'Ivoire)
 
-Le contenu des factures (mentions vendeur/client, NCC, désignation détaillée, TVA ventilée) est aligné sur les mentions exigées localement. **La certification électronique via la Facture Normalisée Électronique (FNE) de la DGI — obligatoire depuis décembre 2025 — est prévue en Phase 1** (intégration API). Tant qu'elle n'est pas branchée, l'outil convient à un usage interne / pilote ; l'émission de factures légalement opposables requiert la certification FNE.
+Le contenu des factures (mentions vendeur/client, NCC, désignation détaillée, TVA ventilée) est aligné sur les mentions exigées localement. La **Facture Normalisée Électronique (FNE)** de la DGI — obligatoire depuis décembre 2025 — est désormais **intégrée** : numéro fiscal au format officiel, sticker de certification et QR code de vérification apparaissent sur le PDF d'une facture certifiée.
+
+---
+
+## ⚠️ Statut de la conformité FNE — à lire
+
+Cette intégration FNE est un **proof of concept (POC) fonctionnel, mais non certifié**. Il faut être clair sur ce qu'elle est et n'est pas :
+
+- ✅ **Ce qui fonctionne** : le module dialogue avec un **mock intégré fidèle au contrat de l'API DGI** (mêmes champs, mêmes erreurs, mêmes formats de réponse). Il génère un numéro fiscal au format officiel `{NCC}{AA}{séquence}`, une URL de vérification et un QR code, et gère la ventilation TVA côté DGI. Le passage à la **plateforme réelle** ne demande qu'une configuration (URL + clé API dans les Paramètres FNE) — aucun changement de code.
+- ❌ **Ce que ce n'est pas** : en l'état (mode simulation, et sans enrôlement officiel auprès de la DGI), **les factures produites ne sont pas légalement opposables**. Le PDF le signale sans ambiguïté : une certification simulée porte le marquage rouge **« SIMULATION FNE — DOCUMENT NON OPPOSABLE »**.
+- 🔜 **Pour une opposabilité réelle** : compte et identifiants API DGI valides, enrôlement de l'entreprise auprès de la plateforme, et validation par un **professionnel agréé** (expert-comptable) pour la conformité SYSCOHADA complète.
+
+Autrement dit : l'outil convient à un usage **interne / pilote** et démontre une intégration prête pour la production, mais la bascule en émission légale relève d'une étape administrative et non technique.
 
 ---
 
@@ -69,10 +82,13 @@ Client (HTML/JS)  ->  Contrôleurs (api_*)  ->  Services (métier)  ->  Reposito
 - **`core/`** — Logger, hiérarchie d'erreurs (`AppError`), enveloppe `Result`, `guard()`.
 - **`models/`** — `Facture`, `Client`, `Parametres` : logique de domaine pure, testable.
 - **`repositories/`** — `BaseRepository` générique (résolution dynamique des colonnes, verrous) + repositories spécifiques.
-- **`services/`** — logique métier : `FactureService`, `ClientService`, `DashboardService`, `NumerotationService`, `PdfService`, `EmailService`, `DriveService`, `ParametresService`.
+- **`services/`** — logique métier : `FactureService`, `ClientService`, `DashboardService`, `NumerotationService`, `PdfService`, `EmailService`, `DriveService`, `ParametresService`, `FneService` (certification DGI, mock + réel).
+- **`utils/`** — `Validator`, `DateUtils`, `Formatter`, `QrCode` (générateur de QR en code pur, sans dépendance, vérifié par décodage).
 - **`controllers/`** — surface API `api_*` exposée à l'UI, renvoie des `Result` sérialisables.
 - **`ui/`** — menu + boîtes de dialogue HTML (factures, clients, paramètres).
 - **`triggers/`** — installation et exécution des déclencheurs.
+
+> 🛠️ **Deux modes de déploiement** : le dépôt modulaire (`src/**`, source de vérité) *ou* la **« version facile »** — un unique `build/Code.gs` généré par `build.sh` (tous les `.gs` fusionnés dans l'ordre des dépendances) à coller dans l'éditeur avec les 5 fichiers HTML.
 
 Détails complets dans [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -99,10 +115,23 @@ clasp push
 
 ---
 
+## 🧪 Tests
+
+Le code métier (modèles, services, FNE, générateur de QR) est testé **hors Google Apps Script** : les globals Google (`SpreadsheetApp`, `PropertiesService`, `Utilities`…) sont simulés, et le code `.gs` est chargé dans un contexte `vm` Node.
+
+```bash
+npm install   # installe jsqr (décodage réel des QR générés)
+npm test      # FNE + QR + bandeau PDF
+```
+
+Couverture actuelle : **95 assertions** — logique FNE (payload DGI, simulation/réel, idempotence, pré-validation FR), **décodage réel** des QR produits (via `jsqr`), et rendu du bandeau de certification (états simulation/réel, marquage « non opposable »).
+
+---
+
 ## 🗺️ Feuille de route
 
 - **Phase 0 — Fondations du contenu** ✅ : lignes multiples, unité, remise %, TVA ventilée, NCC client, clé `ID_Client`.
-- **Phase 1 — Conformité légale** : intégration FNE/DGI (numéro officiel, QR code, cachet fiscal).
+- **Phase 1 — Conformité légale (FNE/DGI)** ✅ *(POC non certifié)* : mock fidèle au contrat API DGI, numéro fiscal officiel, sticker + QR code de vérification, pré-validation FR. Bascule vers la plateforme réelle par simple configuration — voir *Statut de la conformité FNE*.
 - **Phase 2 — Pilotage & analyse** : tableau de bord visuel, rapports `QUERY`, relances automatiques.
 - **Phase 3 — Portfolio & revente** : installation reproductible, packaging.
 - **Phase 4 — Extensions ERP** : devis, produits/services, fournisseurs, paiements partiels, utilisateurs & rôles.
