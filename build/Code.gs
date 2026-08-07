@@ -829,7 +829,111 @@ const QrCode = (function () {
       + 'padding:' + pad + 'px;">' + rows + '</table>';
   }
 
-  return { svg: svg, encode: encode, htmlTable: htmlTable };
+  /* --- Rendu en PNG (data-URI) — le plus fiable pour le PDF de GAS ------ */
+  // Le convertisseur HTML -> PDF de Google rend les <img> (data-URI) de façon
+  // fiable, contrairement au SVG ou à une table de cellules. On encode donc le
+  // QR en PNG « maison » (aucune dépendance) : DEFLATE stocké + zlib + CRC32.
+
+  const CRC_TABLE = (function () {
+    const t = new Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(bytes) {
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function adler32(bytes) {
+    let a = 1, b = 0;
+    for (let i = 0; i < bytes.length; i++) { a = (a + bytes[i]) % 65521; b = (b + a) % 65521; }
+    return ((b << 16) | a) >>> 0;
+  }
+  function u32be(arr, v) { arr.push((v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255); }
+  function chunk(out, type, data) {
+    u32be(out, data.length);
+    const td = [type.charCodeAt(0), type.charCodeAt(1), type.charCodeAt(2), type.charCodeAt(3)];
+    const body = td.concat(data);
+    for (let i = 0; i < body.length; i++) out.push(body[i]);
+    u32be(out, crc32(body));
+  }
+  // Enveloppe zlib avec blocs DEFLATE non compressés (« stored »).
+  function zlibStore(raw) {
+    const out = [0x78, 0x01];
+    let i = 0;
+    while (i < raw.length) {
+      const len = Math.min(65535, raw.length - i);
+      out.push(i + len >= raw.length ? 1 : 0);
+      out.push(len & 255, (len >> 8) & 255);
+      const nlen = (~len) & 0xffff;
+      out.push(nlen & 255, (nlen >> 8) & 255);
+      for (let j = 0; j < len; j++) out.push(raw[i + j]);
+      i += len;
+    }
+    u32be(out, adler32(raw));
+    return out;
+  }
+  function base64(bytes) {
+    const ch = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 3) {
+      const b0 = bytes[i], b1 = bytes[i + 1], b2 = bytes[i + 2];
+      const h1 = i + 1 < bytes.length, h2 = i + 2 < bytes.length;
+      out += ch[b0 >> 2];
+      out += ch[((b0 & 3) << 4) | (h1 ? (b1 >> 4) : 0)];
+      out += h1 ? ch[((b1 & 15) << 2) | (h2 ? (b2 >> 6) : 0)] : '=';
+      out += h2 ? ch[b2 & 63] : '=';
+    }
+    return out;
+  }
+
+  /**
+   * Encode le QR en octets PNG (niveaux de gris, un module = `module` pixels).
+   * @param {string} text
+   * @param {{module?:number, marge?:number}} [opts]
+   * @returns {number[]} octets PNG
+   */
+  function pngBytes(text, opts) {
+    opts = opts || {};
+    const q = encode(text);
+    const scale = opts.module || 4;
+    const quiet = opts.marge != null ? opts.marge : 4;
+    const dim = (q.size + quiet * 2) * scale;
+    const raw = [];
+    for (let y = 0; y < dim; y++) {
+      raw.push(0); // filtre None
+      const my = Math.floor(y / scale) - quiet;
+      for (let x = 0; x < dim; x++) {
+        const mx = Math.floor(x / scale) - quiet;
+        const dark = (my >= 0 && my < q.size && mx >= 0 && mx < q.size) && q.modules[my][mx];
+        raw.push(dark ? 0 : 255);
+      }
+    }
+    const out = [137, 80, 78, 71, 13, 10, 26, 10];
+    const ihdr = [];
+    u32be(ihdr, dim); u32be(ihdr, dim);
+    ihdr.push(8, 0, 0, 0, 0); // 8 bits, niveaux de gris
+    chunk(out, 'IHDR', ihdr);
+    chunk(out, 'IDAT', zlibStore(raw));
+    chunk(out, 'IEND', []);
+    return out;
+  }
+
+  /**
+   * QR en data-URI PNG, prêt à insérer dans un <img src="...">.
+   * @param {string} text
+   * @param {{module?:number, marge?:number}} [opts]
+   * @returns {string}
+   */
+  function pngDataUri(text, opts) {
+    return 'data:image/png;base64,' + base64(pngBytes(text, opts));
+  }
+
+  return { svg: svg, encode: encode, htmlTable: htmlTable, pngBytes: pngBytes, pngDataUri: pngDataUri };
 })();
 
 // ====================================================================
@@ -2087,7 +2191,9 @@ class PdfService {
       ? token.indexOf('simulation.fne.local') !== -1
       : !String(params.fneUrl || '').trim();
 
-    const qr = token ? QrCode.htmlTable(token, { module: 3, marge: 2 }) : '';
+    const qr = token
+      ? '<img src="' + QrCode.pngDataUri(token, { module: 4, marge: 2 }) + '" width="120" height="120" alt="QR de vérification FNE">'
+      : '';
     const classeSim = simulation ? ' sim' : '';
     const banniere = simulation
       ? '<div class="fne-sim">SIMULATION FNE — DOCUMENT NON OPPOSABLE</div>'

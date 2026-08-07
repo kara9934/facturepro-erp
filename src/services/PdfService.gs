@@ -63,7 +63,9 @@ class PdfService {
       ? token.indexOf('simulation.fne.local') !== -1
       : !String(params.fneUrl || '').trim();
 
-    const qr = token ? QrCode.htmlTable(token, { module: 3, marge: 2 }) : '';
+    const qr = token
+      ? '<img src="' + QrCode.pngDataUri(token, { module: 4, marge: 2 }) + '" width="120" height="120" alt="QR de vérification FNE">'
+      : '';
     const classeSim = simulation ? ' sim' : '';
     const banniere = simulation
       ? '<div class="fne-sim">SIMULATION FNE — DOCUMENT NON OPPOSABLE</div>'

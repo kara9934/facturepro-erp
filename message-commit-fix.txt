@@ -1,0 +1,2 @@
+fix : QR du bandeau FNE en image PNG (rendu fiable dans le PDF GAS) + test PNG
+

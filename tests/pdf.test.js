@@ -42,7 +42,7 @@ ok(bandSim.indexOf('fne-band') !== -1, 'simulation -> bandeau présent');
 ok(bandSim.indexOf('9606123E26000000019') !== -1, 'simulation -> numéro fiscal affiché');
 ok(bandSim.indexOf('NON OPPOSABLE') !== -1, 'simulation -> marquage NON OPPOSABLE');
 ok(bandSim.indexOf('fne-band sim') !== -1, 'simulation -> classe sim (rouge)');
-ok(bandSim.indexOf('<table') !== -1 && bandSim.indexOf('background:#000') !== -1, 'simulation -> QR en table de cellules');
+ok(bandSim.indexOf('<img') !== -1 && bandSim.indexOf('data:image/png;base64,') !== -1, 'simulation -> QR en image PNG (data-URI)');
 ok(bandSim.indexOf(tokenSim) !== -1, 'simulation -> URL de vérification affichée');
 
 // 3. Facture certifiée en RÉEL (token DGI, params.fneUrl défini)

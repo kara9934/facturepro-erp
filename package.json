@@ -4,11 +4,12 @@
   "private": true,
   "description": "Tests unitaires (Node) du code Google Apps Script de FacturePro ERP — exécutés hors GAS via un contexte vm avec stubs des services Google.",
   "scripts": {
-    "test": "node tests/fne.test.js && node tests/qrcode.test.js && node tests/pdf.test.js",
+    "test": "node tests/fne.test.js && node tests/qrcode.test.js && node tests/pdf.test.js && node tests/png.test.js",
     "build": "bash build.sh build/Code.gs"
   },
   "devDependencies": {
-    "jsqr": "^1.4.0"
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0"
   },
   "license": "MIT"
 }
